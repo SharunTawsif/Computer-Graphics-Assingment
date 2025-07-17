@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>20210104124</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #d9e3ee; 
+    }
+  </style>
+</head>
+<body>
+<canvas id="webglcanvas" width="500" height="500"></canvas>
+
+
+
+<!-- WebGL rendering context -->
+<script>
+var canvas = document.getElementById("webglcanvas"); 
+var gl = canvas.getContext("webgl");
+
+if (!gl) {
+    console.error("WebGL context not available");
+}
+
+
+
+
+// Vertex shader -> process each vertex of the shape
+var vertexShaderSource =
+   `attribute vec3 a_coords;
+    void main() {
+        gl_Position = vec4(a_coords, 1.0);
+    }`;
+
+// Fragment shader (blue) -> determines the color of each pixel
+var fragmentShaderSource =
+   `void main() {
+        gl_FragColor = vec4(0.431, 0.655, 0.784, 1.0);
+    }`;
+
+//compile
+var vsh = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vsh, vertexShaderSource); //attached source code
+gl.compileShader(vsh);
+
+var fsh = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fsh, fragmentShaderSource);
+gl.compileShader(fsh);
+
+// Program setup
+var prog = gl.createProgram(); //container
+
+gl.attachShader(prog, vsh); 
+gl.attachShader(prog, fsh);
+gl.linkProgram(prog); 
+gl.useProgram(prog); //program activated
+
+var a_coords_location = gl.getAttribLocation(prog, "a_coords"); 
+
+
+var coords = new Float32Array([
+    // center square
+    -0.3,  0.2, 0.0,
+    -0.3, -0.2, 0.0,
+     0.3, -0.2, 0.0,
+
+    -0.3,  0.2, 0.0,
+     0.3,  0.2, 0.0,
+     0.3, -0.2, 0.0,
+
+    // right square
+     0.32,  0.2, 0.0,
+     0.32, -0.2, 0.0,
+     0.72, -0.2, 0.0,
+
+     0.32,  0.2, 0.0,
+     0.72,  0.2, 0.0,
+     0.72, -0.2, 0.0,
+
+    // roof of center square 
+    -0.3,  0.2, 0.0,
+     0.3,  0.2, 0.0,
+     0.0,  0.6, 0.0,
+
+    // left wing lower
+    -0.42, 0.2, 0.0,
+    -0.32, 0.2, 0.0,
+     0.0,  0.62, 0.0,
+
+    // left wing upper
+    -0.42, 0.2, 0.0,
+     0.0,  .72, 0.0,
+     0.0,  0.62, 0.0,
+
+    // right wing lower
+     0.32, 0.2, 0.0,
+     0.42, 0.2, 0.0,
+     0.0,  .62, 0.0,
+
+    // right wing upper
+     0.0,  0.72, 0.0,
+     0.0,  0.62, 0.0,
+     0.42, 0.2, 0.0,
+
+    // top right extension lower
+     0.02, 0.72, 0.0,
+     0.42, 0.22, 0.0,
+     0.42, .72, 0.0,
+
+    // top right extension upper
+     0.42, 0.22, 0.0,
+     0.42, 0.72, 0.0,
+     0.82, .22, 0.0,
+
+    // small left triangle
+    -0.49, 0.1, 0.0,
+    -0.31, 0.1, 0.0,
+    -0.41,  0.21, 0.0,
+
+    // small right triangle
+    -0.32, 0.1, 0.0,
+    -0.411, 0.2, 0.0,
+    -0.32, 0.21, 0.0
+]);
+
+
+const shiftX = -0.2; 
+const shiftY = -0.2;   
+for (let i = 0; i < coords.length; i += 3) {
+  coords[i]   += shiftX; 
+  coords[i+1] += shiftY; 
+}
+
+
+var a_coords_buffer = gl.createBuffer(); //creates a new buffer in the GPU memory
+gl.bindBuffer(gl.ARRAY_BUFFER, a_coords_buffer); 
+gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW); //This uploads coordinates into the buffer
+gl.vertexAttribPointer(a_coords_location, 3, gl.FLOAT, false, 0, 0); //no stride or offset
+gl.enableVertexAttribArray(a_coords_location);  
+
+gl.clearColor(0.780, 0.824, 0.871, 1.0); // canvas background
+gl.clear(gl.COLOR_BUFFER_BIT);
+gl.drawArrays(gl.TRIANGLES, 0, coords.length / 3); 
+</script>
+</body>
+</html>
