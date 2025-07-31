@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Part A</title>
+</head>
+<body>
+    <canvas id="webglcanvas" width="500" height="500" style="border:1px solid black; display: block; margin: 0 auto;"></canvas>
+
+    <script>
+        var canvas = document.getElementById("webglcanvas");
+        var gl = canvas.getContext("webgl");
+
+        var circles = [];
+
+        // Vertex Shader with aspect ratio correction
+        var vertexShaderSource = `
+            attribute vec2 a_coords;
+            attribute vec3 a_color;
+            varying vec3 v_color;
+            uniform float u_aspect;
+
+            void main() {
+                gl_Position = vec4(a_coords.x * u_aspect, a_coords.y, 0.0, 1.0);
+                v_color = a_color;
+            }
+        `;
+
+        var fragmentShaderSource = `
+            precision mediump float;
+            varying vec3 v_color;
+
+            void main() {
+                gl_FragColor = vec4(v_color, 1.0);
+            }
+        `;
+
+        // Compile Shader
+        function createShader(gl, type, source) {
+            var shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        var fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+        // Link Program
+        function createProgram(gl, vertexShader, fragmentShader) {
+            var program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error(gl.getProgramInfoLog(program));
+                gl.deleteProgram(program);
+                return null;
+            }
+            return program;
+        }
+
+        var program = createProgram(gl, vertexShader, fragmentShader);
+        gl.useProgram(program);
+
+        // Attribute locations
+        var a_coords = gl.getAttribLocation(program, "a_coords");
+        var a_color = gl.getAttribLocation(program, "a_color");
+        var u_aspect = gl.getUniformLocation(program, "u_aspect");
+
+        // Generate circle vertices
+        function createCircleVertices(centerX, centerY, radius, color) {
+            var vertices = [];
+            var colors = [];
+            var segments = 100;
+
+            for (var i = 0; i <= segments; i++) {
+                var angle = (i / segments) * Math.PI * 2;
+                vertices.push(centerX, centerY);
+                colors.push(color[0], color[1], color[2]);
+
+                vertices.push(centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle));
+                colors.push(color[0], color[1], color[2]);
+
+                angle = ((i + 1) / segments) * Math.PI * 2;
+                vertices.push(centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle));
+                colors.push(color[0], color[1], color[2]);
+            }
+
+            return { vertices: new Float32Array(vertices), colors: new Float32Array(colors) };
+        }
+
+        // Mouse click event
+        canvas.addEventListener("mousedown", function () {
+            var radius = 0.4 - circles.length * 0.05;
+            if (radius > 0.05) {
+                var color = [Math.random(), Math.random(), Math.random()];
+                circles.push(createCircleVertices(0.0, 0.0, radius, color));
+                drawCircles();
+            }
+        });
+
+        // Draw all circles
+        function drawCircles() {
+            gl.clearColor(0.9, 0.9, 0.9, 1.0); // Set background color
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // Aspect ratio: height / width
+            gl.uniform1f(u_aspect, canvas.height / canvas.width);
+
+            circles.forEach(circle => {
+                var buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, circle.vertices, gl.STATIC_DRAW);
+
+                gl.vertexAttribPointer(a_coords, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(a_coords);
+
+                var colorBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, circle.colors, gl.STATIC_DRAW);
+
+                gl.vertexAttribPointer(a_color, 3, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(a_color);
+
+                gl.drawArrays(gl.TRIANGLES, 0, circle.vertices.length / 2);
+            });
+        }
+
+        // Initial clear and default circle
+        gl.clearColor(0.9, 0.9, 0.9, 1.0); // Set background color
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        // Add a default circle in the middle
+        var defaultColor = [0.5, 0.5, 1.0];
+        circles.push(createCircleVertices(0.0, 0.0, 0.4, defaultColor));
+        drawCircles();
+    </script>
+</body>
+</html>

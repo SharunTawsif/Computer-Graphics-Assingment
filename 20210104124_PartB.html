@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Part B</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; margin: 0 auto; border: 1px solid #444; }
+    </style>
+</head>
+<body>
+<canvas id="webglcanvas" width="600" height="600"></canvas>
+<script>
+const canvas = document.getElementById("webglcanvas");
+const gl = canvas.getContext("webgl");
+
+// Vertex Shader
+const vertexShaderSource = `
+    attribute vec2 a_coords;
+    attribute vec3 a_color;
+    varying vec3 v_color;
+    void main() {
+        gl_Position = vec4(a_coords, 0.0, 1.0);
+        v_color = a_color;
+    }
+`;
+
+// Fragment Shader with a GLSL control statement
+const fragmentShaderSource = `
+    precision mediump float;
+    varying vec3 v_color;
+    uniform bool u_night; // for day/night mode
+
+    void main() {
+        vec3 color = v_color;
+        // GLSL control: darken color if night mode
+        if (u_night) {
+            color = color * 0.3 + vec3(0.0, 0.0, 0.1); // blueish night tint
+        }
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+function createShader(gl, type, source) {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
+
+function createProgram(gl, v, f) {
+    var prog = gl.createProgram();
+    gl.attachShader(prog, v);
+    gl.attachShader(prog, f);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(prog));
+        gl.deleteProgram(prog);
+        return null;
+    }
+    return prog;
+}
+
+const vs = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+const fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+const prog = createProgram(gl, vs, fs);
+gl.useProgram(prog);
+
+const a_coords = gl.getAttribLocation(prog, "a_coords");
+const a_color  = gl.getAttribLocation(prog, "a_color");
+const u_night  = gl.getUniformLocation(prog, "u_night");
+
+// ------------------------------------------------
+// Geometry: each part made from triangles (over 45 vertices)
+// ------------------------------------------------
+
+let vertices = [];
+let colors = [];
+
+// ----------- SKY -----------
+vertices.push(
+    -1.0,  1.0,   1.0,  1.0,   1.0, -0.2,
+    -1.0,  1.0,   1.0, -0.2,  -1.0, -0.2
+);
+for(let i=0; i<6; ++i) colors.push(0.5, 0.80, 1.0); // sky blue
+
+// ----------- GRASS -----------
+vertices.push(
+    -1.0, -0.2,   1.0, -0.2,   1.0, -1.0,
+    -1.0, -0.2,   1.0, -1.0,  -1.0, -1.0
+);
+for(let i=0; i<6; ++i) colors.push(0.1, 0.7, 0.2); // green
+
+// ----------- HOUSE BODY -----------
+vertices.push(
+    -0.5, -0.2,   0.5, -0.2,   0.5,  0.4,
+    -0.5, -0.2,   0.5,  0.4,  -0.5,  0.4
+);
+for(let i=0; i<6; ++i) colors.push(0.9, 0.7, 0.5); // light brown
+
+// ----------- ROOF -----------
+vertices.push(
+    -0.6, 0.4,   0.0, 0.7,   0.6, 0.4
+);
+colors.push(0.7,0.2,0.1,  0.8,0.2,0.1,  0.7,0.1,0.1); // deep red
+
+// ----------- DOOR -----------
+vertices.push(
+    -0.1, -0.2,  0.1, -0.2,   0.1, 0.1,
+    -0.1, -0.2,  0.1,  0.1,  -0.1, 0.1
+);
+for(let i=0; i<6; ++i) colors.push(0.6, 0.4, 0.2); // brown
+
+// ----------- LEFT WINDOW -----------
+vertices.push(
+    -0.4, 0.0,   -0.25, 0.0,  -0.25, 0.18,
+    -0.4, 0.0,   -0.25, 0.18, -0.4,  0.18
+);
+for(let i=0; i<6; ++i) colors.push(0.8,0.95,1.0); // glass blue
+
+// ----------- RIGHT WINDOW -----------
+vertices.push(
+    0.25, 0.0,  0.4, 0.0,  0.4, 0.18,
+    0.25, 0.0,  0.4, 0.18, 0.25, 0.18
+);
+for(let i=0; i<6; ++i) colors.push(0.8,0.95,1.0);
+
+// ----------- SUN -----------
+const sun_cx = 0.8, sun_cy = 0.8, sun_r = 0.15;
+let sunVerts = [];
+let sunColors = [];
+const N = 16;
+for(let i=0; i<N; ++i) {
+    let theta1 = 2*Math.PI*i/N, theta2 = 2*Math.PI*(i+1)/N;
+    sunVerts.push(
+        sun_cx, sun_cy,
+        sun_cx + sun_r * Math.cos(theta1), sun_cy + sun_r * Math.sin(theta1),
+        sun_cx + sun_r * Math.cos(theta2), sun_cy + sun_r * Math.sin(theta2)
+    );
+    for(let j=0;j<3;++j) sunColors.push(1.0, 1.0, 0.2); // yellow
+}
+vertices = vertices.concat(sunVerts);
+colors = colors.concat(sunColors);
+
+// ----------- PATHWAY -----------
+vertices.push(
+    -0.05, -0.2,  0.05, -0.2,   0.2, -1.0,
+    -0.05, -0.2,  0.2, -1.0,  -0.2, -1.0
+);
+for(let i=0; i<6; ++i) colors.push(0.85, 0.85, 0.85); // light gray
+
+// ----------- CLOUD -----------
+const cloudBaseX = -0.7, cloudBaseY = 0.7, cloudR = 0.09;
+let cloudVerts = [], cloudColors = [];
+for(let c=0; c<3; ++c) {
+    let cx = cloudBaseX + c*cloudR*0.9, cy = cloudBaseY + ((c==1)?cloudR*0.3:0);
+    for(let i=0;i<N;++i) {
+        let theta1 = 2*Math.PI*i/N, theta2 = 2*Math.PI*(i+1)/N;
+        cloudVerts.push(
+            cx, cy,
+            cx + cloudR * Math.cos(theta1), cy + cloudR * Math.sin(theta1),
+            cx + cloudR * Math.cos(theta2), cy + cloudR * Math.sin(theta2)
+        );
+        for(let j=0;j<3;++j) cloudColors.push(1,1,1); // white
+    }
+}
+vertices = vertices.concat(cloudVerts);
+colors = colors.concat(cloudColors);
+
+// --- COUNT VERTICES (for your report) ---
+console.log("Total vertices:", vertices.length / 2);
+
+// ---------- UPLOAD TO GPU ----------
+const vertBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+const colorBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+function draw(nightMode) {
+    gl.clearColor(0.2, 0.3, 0.45, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // position attribute
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertBuf);
+    gl.vertexAttribPointer(a_coords, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords);
+
+    // color attribute
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
+    gl.vertexAttribPointer(a_color, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_color);
+
+    gl.uniform1i(u_night, nightMode ? 1 : 0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
+}
+
+// ---------- INTERACTION -----------
+let nightMode = false;
+draw(nightMode);
+
+window.addEventListener('keydown', (e)=>{
+    if(e.code === "Space") {
+        nightMode = !nightMode;
+        draw(nightMode);
+    }
+});
+</script>
+</body>
+</html>
